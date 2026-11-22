@@ -1,5 +1,7 @@
 # Entropy-Gated Latent Recursion
 
+**Paper:** [arXiv:2606.16620](https://arxiv.org/pdf/2606.16620)
+
 A training-free decoding method that re-applies a frozen language model's top layers at uncertain tokens, giving a second, deterministic way to diversify reasoning rollouts beside temperature sampling.
 
 ## In simple words
