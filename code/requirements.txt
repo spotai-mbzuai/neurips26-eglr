@@ -1,0 +1,12 @@
+# Python 3.11. Versions match the environment used for the paper's experiments.
+# torch is the CUDA 12.8 build; change the index URL for another CUDA version.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0
+transformers==4.57.1
+accelerate==1.9.0
+datasets==4.8.4
+numpy==2.2.6
+PyYAML==6.0.3
+tqdm==4.67.1
+wandb==0.23.1
+python-dotenv==1.1.1

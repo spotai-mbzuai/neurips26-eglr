@@ -1,0 +1,68 @@
+## ============================================================================
+## EGLR — Entropy-Gated Latent Recursion | Hendrycks MATH | Qwen2.5-3B-Instruct
+##
+## Training-free test-time refinement. No fine-tuning. Zero new parameters.
+##
+## Usage
+## -----
+##   Smoke test (50 samples):
+##     python main_eglr.py --config configs/math_qwen_3b_eglr.yaml --samples 50
+##
+##   Full eval (1000 samples):
+##     python main_eglr.py --config configs/math_qwen_3b_eglr.yaml
+##
+##   Ablation (override hparams from CLI):
+##     python main_eglr.py --config configs/math_qwen_3b_eglr.yaml \
+##       --L 2 --alpha 0.1 --K_max 3 --tau_entropy 1.0 --norm_match true
+##
+## Key EGLR knobs
+## ─────────────
+##   L           : # top layers to re-invoke (Qwen-3B has 36 layers; L=2 → re-runs
+##                 layers 34-35). Higher L ↦ deeper refinement but more drift risk.
+##   alpha       : fusion weight for h_k into h_anchor. Small α (0.1-0.3) keeps
+##                 the refinement close to the original trajectory.
+##   K_max       : max recursion iterations per token. 3 is a safe starting point.
+##   tau_entropy : entropy threshold (nats) above which refinement fires. Tune so
+##                 that refinement_rate lands in [3%, 15%] for math CoT.
+##   tau_kl      : KL early-exit when consecutive distributions are ~identical.
+##   norm_match  : rescale h_k to match h_anchor's L2 norm before fusion.
+## ============================================================================
+
+parameters:
+  cache_dir: ~/.cache/huggingface/hub
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  torch_dtype: bfloat16
+  device_map: cuda
+  is_instruct: true
+
+# ──────────────────────────────────────────────────────────────────────────
+# EGLR hyperparameters
+# ──────────────────────────────────────────────────────────────────────────
+eglr:
+  L:           4          # re-invoke last 2 decoder layers
+  alpha:       0.2        # fusion weight for refined hidden state
+  K_max:       3          # cap on recursion depth per token
+  tau_entropy: 0.8        # trigger refinement when next-token entropy > 1.0 nat
+  tau_kl:      1.0e-3     # early-exit when KL(p_k, p_{k-1}) < this
+  norm_match:  true       # rescale h_k to h_anchor's norm before fusion
+  kv_cache:   actual         # "actual" (restore K/V — Fix B) or "modified" (keep refined K/V)
+
+# ──────────────────────────────────────────────────────────────────────────
+# Where run artifacts land (checkpoint_path/main_eglr/eglr_outputs|eglr_summaries/)
+# ──────────────────────────────────────────────────────────────────────────
+
+dataset:
+  name: gsm8k
+  samples: 1319           # how many test problems to evaluate on
+
+generation:
+  max_new_tokens: 768
+  temperature:    0.0     # greedy — deterministic for fair EGLR vs baseline comparison
+  top_p:          1.0
+  top_k:          1
+  do_sample:      false
+  test_batch_size: 16      # batched eval; reduce if you hit OOM
+
+prompts:
+  system_eval:  "You are a mathematical expert providing correct solutions with logical reasoning. Please reason step by step, and put your final numeric answer after ####"

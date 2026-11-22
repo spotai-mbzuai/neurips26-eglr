@@ -1,0 +1,11 @@
+venv/
+env/
+__pycache__/
+*.pyc
+.env
+artifacts/
+logs/
+EXTRA/
+# Run logs / stdout dumps
+*.log
+*.out

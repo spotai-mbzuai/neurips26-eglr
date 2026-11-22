@@ -1,0 +1,20 @@
+Copyright (c) 2026 The EGLR Authors.
+
+Permission is granted to use, copy and modify this software for research and
+other non-commercial purposes, provided that:
+
+1. Any publication, report or derived work that uses this software, in whole
+   or in part, cites the following paper:
+
+     Soham Bhattacharjee, Dushyant Singh Chauhan, Salem Lahlou, Martin Takac,
+     Nils Lukas. "Entropy-Gated Latent Recursion." arXiv preprint
+     arXiv:2606.16620, 2026.
+
+2. This copyright notice and these conditions are kept in all copies or
+   substantial portions of the software.
+
+Commercial use requires prior written permission from the authors.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.

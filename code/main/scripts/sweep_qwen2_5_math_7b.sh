@@ -1,0 +1,76 @@
+#!/bin/bash
+set -euo pipefail
+# Greedy L=0..10 sweep across all math datasets for Qwen2.5-Math-7B-Instruct.
+# Auto-calibrates tau_entropy as the 95th-percentile per-token entropy from
+# each L=0 run, so each (dataset) gets its own data-driven tau.
+# Usage:  bash main/scripts/sweep_qwen2_5_math_7b.sh <GPU_ID>     (default GPU 0)
+# Run from main/ folder.
+
+GPU=${1:-0}
+MODEL="Qwen/Qwen2.5-Math-7B-Instruct"
+MODEL_SHORT="Qwen2.5-Math-7B-Instruct"
+CONFIG=main/configs/all_greedy.yaml
+DATASETS=("math_500" "amc23" "aime24" "aime25" "minerva_math" "gsm8k")
+TARGET_REFINE_RATE=0.05
+MAX_ENTROPY=2.5     # cap before computing 95th percentile (drops outlier high-entropy tokens)
+RESULTS_BASE=outputs/.checkpoints/EGLR/main_eglr/eglr_outputs
+
+# Per-dataset system prompts (AIME has strict 0-999 integer answer constraint).
+PROMPT_DEFAULT='You are a mathematical expert. Solve the following problem step-by-step with clear reasoning. Ensure the final answer is simplified and placed inside \boxed{}.'
+PROMPT_AIME='You are a mathematical expert. Solve the following AIME problem step-by-step. The answer is an integer between 0 and 999. Place the final answer inside \boxed{}.'
+
+mkdir -p outputs/.logs/EGLR/stdout
+
+for DATASET in "${DATASETS[@]}"; do
+    RESULTS_DIR=${RESULTS_BASE}/${MODEL_SHORT}/${DATASET}
+    mkdir -p ${RESULTS_DIR}
+    echo ""
+    echo "==================== ${MODEL_SHORT} × ${DATASET} ===================="
+
+    case "${DATASET}" in
+        aime24|aime25) PROMPT="${PROMPT_AIME}" ;;
+        *)             PROMPT="${PROMPT_DEFAULT}" ;;
+    esac
+
+    # Resume logic: math_500 already has L=0,1,2 from a previous run.
+    # Skip baseline + recalibration for that one dataset; reuse the known tau.
+    if [ "${DATASET}" = "math_500" ]; then
+        TAU=0.855910
+        L_LIST="3 4 5 6 7 8 9 10"
+        echo "[${DATASET}] RESUME — reusing tau=${TAU}, running L=${L_LIST}"
+    else
+        # Step 1: L=0 baseline (no refinement; harvest entropy distribution).
+        LOG=outputs/.logs/EGLR/stdout/${MODEL_SHORT}_${DATASET}_L0.log
+        echo "[${DATASET}] Running L=0 (baseline) → ${LOG}"
+        CUDA_VISIBLE_DEVICES=${GPU} python main/main_eglr.py \
+            --config ${CONFIG} \
+            --model ${MODEL} \
+            --dataset ${DATASET} \
+            --system_prompt "${PROMPT}" \
+            --L 0 \
+            > ${LOG} 2>&1
+
+        # Step 2: Auto-calibrate tau from the L=0 JSONL.
+        L0_JSONL=$(ls -t ${RESULTS_DIR}/*_L0_*.jsonl | head -1)
+        TAU=$(python main/scripts/compute_tau.py "${L0_JSONL}" ${TARGET_REFINE_RATE} ${MAX_ENTROPY})
+        echo "[${DATASET}] Calibrated tau_entropy = ${TAU}  (target rate = ${TARGET_REFINE_RATE})"
+        L_LIST="1 2 3 4 5 6 7 8 9 10"
+    fi
+
+    # Step 3: Run remaining L values with the chosen tau.
+    for L in ${L_LIST}; do
+        LOG=outputs/.logs/EGLR/stdout/${MODEL_SHORT}_${DATASET}_L${L}.log
+        echo "[${DATASET}] Running L=${L} (tau=${TAU}) → ${LOG}"
+        CUDA_VISIBLE_DEVICES=${GPU} python main/main_eglr.py \
+            --config ${CONFIG} \
+            --model ${MODEL} \
+            --dataset ${DATASET} \
+            --system_prompt "${PROMPT}" \
+            --L ${L} \
+            --tau_entropy ${TAU} \
+            > ${LOG} 2>&1
+    done
+done
+
+echo ""
+echo "[${MODEL_SHORT}] Done — all ${#DATASETS[@]} datasets, L=0..10."

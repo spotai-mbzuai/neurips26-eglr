@@ -1,0 +1,44 @@
+## ============================================================================
+## Phase 3 dataset list — shared across all per-model sweeps.
+##
+## Each dataset entry supplies:
+##   name            : dispatch key (matches data.py + extraction.py handlers)
+##   samples         : sample cap; set to the full test-set size for full eval
+##   max_new_tokens  : generation budget for this dataset's difficulty profile
+##
+## Conventions
+## ───────────
+## * GSM8K is automatically moved to the end of the sequence by run_sweep.py
+##   regardless of its position here, but we list it last by convention.
+## * Order of the non-GSM8K datasets is smallest → largest (AIME 30 → MATH-500
+##   500), so early failures in a sweep surface quickly on cheap datasets.
+## * Sample counts are the *full* test splits for the smaller datasets; set to
+##   a positive integer smaller than the split size to subsample (stratified
+##   where applicable).
+## ============================================================================
+
+datasets:
+  - name: aime24
+    samples: 30                 # full test split
+    max_new_tokens: 4096        # competition problems need long chain-of-thought
+
+  - name: aime25
+    samples: 30
+    max_new_tokens: 4096
+
+  - name: amc23
+    samples: 40
+    max_new_tokens: 4096
+
+  - name: minerva_math
+    samples: 272                # ~full math-ai/minervamath test split
+    max_new_tokens: 4096
+
+  - name: math_500
+    samples: 500                # full HuggingFaceH4/MATH-500
+    max_new_tokens: 4096
+
+  # ── GSM8K always last (run_sweep.py also enforces this) ───────────────────
+  - name: gsm8k
+    samples: 1319               # full gsm8k test split
+    max_new_tokens: 4096         # short numeric answers, shorter CoT suffices

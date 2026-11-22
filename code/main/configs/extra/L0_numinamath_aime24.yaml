@@ -1,0 +1,46 @@
+## ============================================================================
+## EGLR — Phase 1 L-sweep | AIME24 (30 samples) | NuminaMath-7B-CoT
+## ============================================================================
+## Per-model starting values from the plan:
+##   tau_entropy = 1.0   (math-specialized CoT model)
+##   tau_kl      = 5.0e-4  (Mistral architecture, vocab ~32K → KL scales
+##                          lower than larger-vocab models → tighter tau_kl)
+##
+## NuminaMath-7B-CoT is trained to output "The answer is X" style. The
+## extractor tries \boxed{} first then falls back to get_unnormalized_answer
+## ("The answer is X"). We prompt with the boxed convention and mention
+## the AIME 0-999 integer constraint for maximum accuracy.
+## ============================================================================
+
+parameters:
+  cache_dir: ~/.cache/huggingface/hub
+model:
+  name: Qwen/Qwen2.5-3B-Instruct
+  torch_dtype: bfloat16
+  device_map: cuda
+  is_instruct: true
+
+eglr:
+  L:           0
+  alpha:       0.2
+  K_max:       3
+  tau_entropy: 1.0
+  tau_kl:      5.0e-4
+  norm_match:  true
+  kv_cache:   actual         # "actual" (restore K/V — Fix B) or "modified" (keep refined K/V)
+
+dataset:
+  name: aime24
+  # AIME24 only has 30 problems in its test split.
+  samples: 30
+
+generation:
+  max_new_tokens: 4096
+  temperature:    0.0
+  top_p:          1.0
+  top_k:          1
+  do_sample:      false
+  test_batch_size: 16
+
+prompts:
+  system_eval: "You are a mathematical expert. Solve the following AIME problem step by step, showing all your work clearly. The final answer must be an integer between 0 and 999. Put your final answer inside \\boxed{}."

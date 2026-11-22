@@ -1,0 +1,59 @@
+## ============================================================================
+## EGLR — Phase 3 full benchmark sweep | Qwen/Qwen2.5-3B-Instruct
+##
+## Fully auto-calibrated: tau_entropy is chosen from the eval-base (L=0) run's
+## entropy distribution and adjusted per-L to keep refinement rate in [5%%, 10%%].
+## Note: Mid-capacity.
+##
+## Usage
+## -----
+##   bash scripts/phase3_qwen2_5_3b.sh                      # full sweep
+##   bash scripts/phase3_qwen2_5_3b.sh --no-resume          # force fresh run
+##   bash scripts/phase3_qwen2_5_3b.sh --max-attempts 5     # allow 5 retries
+##
+## Datasets processed (per configs/phase3_datasets.yaml):
+##   aime24 → aime25 → amc23 → minerva_math → math_500 → gsm8k  (gsm8k last)
+##
+## L values (per dataset): 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+## ============================================================================
+
+parameters:
+  cache_dir: ~/.cache/huggingface/hub
+  env_path: ../../.env
+  checkpoint_path: outputs/.checkpoints/EGLR
+  wandb_path: outputs/.wandb/EGLR
+  logs_path: outputs/.logs/EGLR
+  wandb_project: EGLR
+model:
+  name: Qwen/Qwen2.5-3B-Instruct
+  torch_dtype: bfloat16
+  device_map: cuda
+  is_instruct: true
+
+eglr:
+  L:           0              # seeded from L list in run_sweep.py
+  alpha:       0.2
+  K_max:       3              # Phase 1/2 fixed; K_max sweep happens separately
+  tau_entropy: 0.8            # fallback only — auto-calibrated at runtime
+  tau_kl:      5.0e-4
+  norm_match:  true
+  kv_cache:   actual         # "actual" (restore K/V — Fix B) or "modified" (keep refined K/V)
+
+# Dataset + generation below are DEFAULTS only — run_sweep.py overrides
+# dataset.name / dataset.samples / generation.max_new_tokens per iteration
+# from configs/phase3_datasets.yaml.
+dataset:
+  name: math_500
+  # AIME24 only has 30 problems in its test split.
+  samples: 500
+
+generation:
+  max_new_tokens: 3072
+  temperature:    0.0         # greedy for fair EGLR vs baseline comparison
+  top_p:          1.0
+  top_k:          1
+  do_sample:      false
+  test_batch_size: 16
+
+prompts:
+  system_eval: "You are a mathematical expert. Solve the following problem step-by-step with clear reasoning. Ensure the final answer is simplified and placed inside \\boxed{}."
